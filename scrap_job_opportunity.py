@@ -7,8 +7,8 @@ from time import sleep
 
 
 sites = ["linkedin", "catho", "infojobs", "empregos.com.br", "sine", "vagas.com", "indeed.com.br", "ciee", "emprega brasil"]
-email='thiago.fm2@hotmail.com'
-common_pass = 'thiago.fm2'
+email=''
+common_pass = ''
 df = pd.DataFrame(columns=['LOCAL', 'VALOR', 'EMPRESA'])
 
 browser = Firefox()
