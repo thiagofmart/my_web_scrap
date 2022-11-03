@@ -55,6 +55,9 @@ if __name__ == '__main__':
     while True:
         i = input('Deseja extrair (S/n): ')
         if i.upper() == 'S':
-            extrair()
+            try:
+                extrair()
+            except:
+                print('Não deu certo amigão')
         else:
             break 
