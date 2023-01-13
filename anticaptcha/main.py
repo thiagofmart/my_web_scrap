@@ -1,38 +1,36 @@
-from selenium.webdriver import Chrome, ChromeOptions
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.support.wait import WebDriverWait
-import os
 from time import sleep
-from collections.abc import Iterable
-import urllib
-import zipfile
-from pathlib import Path
 from utils import *
-import json
+from anticaptchaofficial.recaptchav2enterpriseproxyless import *
 
-"""
-Os webdrivers_managers possuem limite de 60 requests por hora.
-Os downloads são realizados através do repositório git oficial dos webdrivers.
-Para evitar problemas com os pull requests automáticos é válido configurar
-a variável de ambiente GH_TOKEN (Github Token), 
-"""
-def create_driver(PROXY: None|str = None, configure_proxy: bool = False, extensions: list|tuple|set = []):  
-    options = ChromeOptions()
-    # Configurando o PROXY (se tiver)
-    if configure_proxy and not PROXY: options.add_argument(f"--proxy-server={os.environ.get('PROXY')}")
-    if configure_proxy and PROXY: options.add_argument(f"--proxy-server={PROXY}")
-    # Adicionando os plugins e extensões
-    options.add_extension('./plugin.zip')
-    # for extension in extensions: options.add_extension(extension)
 
-    driver = Chrome(
-        service=Service(ChromeDriverManager().install()), 
-        options=options
-        )
-    return driver
+def _select_option(select_element, option_value: str, case_sensitive: bool = False):
+    options_elements = select_element.find_elements(By.TAG_NAME, "option")
+    if case_sensitive:
+        options_values = [option.get_attribute("value") for option in options_elements]
+    else:
+        option_value = option_value.upper()
+        options_values = [option.get_attribute("value").upper() for option in options_elements]
+        
+    if option_value in options_values:
+        options_elements[options_values.index(option_value)].click() 
+    else:
+        raise Exception(f'Opção Inválida!\n\nA opção: "{option_value}" não foi encontrado na lista de opções')
 
+
+def solve_captcha(url, captcha_key, solver, input_id):
+    solver.set_verbose(1)
+    solver.set_key("")
+    solver.set_website_url(url)
+    solver.set_website_key(captcha_key)
+    solution = solver.solve_and_return_solution()
+    if solution:
+        print(solution)
+        driver.execute_script(f"document.getElementById('g-recaptcha-response').innerHTML = '{solution}'")
+        return solution
+    else:
+        print(solution.err_string)
+        return solver.err_string
 
 def consultar(tipo_pesquisa: str, valor: str, tipo_debito: str|None = None):
     driver.get("https://www.dividaativa.pge.sp.gov.br/sc/pages/consultas/consultarDebito.jsf")
@@ -52,33 +50,14 @@ def consultar(tipo_pesquisa: str, valor: str, tipo_debito: str|None = None):
             select_element=driver.find_element(By.ID, 'consultaDebitoForm:decTxtTipoConsulta:tiposDebitosCnpj'), 
             option_value=tipo_debito,
             )
-
-    captcha_iframe = driver.find_element(By.XPATH, "/html/body/div[1]/div/div/div/div[2]/div/div[3]/div/div[2]/div[2]/span/form/span/div/div[2]/table/tbody/tr/td[2]/span/span/div[1]/div/div/iframe")
-    solve_captcha(iframe=captcha_iframe, by=By.ID, reference="recaptcha-anchor")
-
-
-def download_anti_captcha_plugin():
-    url = 'https://antcpt.com/anticaptcha-plugin.zip'
-    # download the plugin
-    filehandle, _ = urllib.request.urlretrieve(url)
-    print(filehandle)
-    # unzip it
-    with zipfile.ZipFile(filehandle, "r") as f:
-        f.extractall("plugin")
-
-
-def configure_API_key_in_anti_captcha_plugin_file(api_key):
-    file = Path('./plugin/js/config_ac_api_key.js')
-    file.write_text(file.read_text().replace("antiCapthaPredefinedApiKey = ''", "antiCapthaPredefinedApiKey = '{}'".format(api_key)))
-
-    # zip plugin directory back to plugin.zip
-    zip_file = zipfile.ZipFile('./plugin.zip', 'w', zipfile.ZIP_DEFLATED)
-    for root, dirs, files in os.walk("./plugin"):
-            for file in files:
-                path = os.path.join(root, file)
-                zip_file.write(path, arcname=path.replace("./plugin/", ""))
-    zip_file.close()
-
+    solution = solve_captcha(
+        url="https://www.dividaativa.pge.sp.gov.br/sc/pages/consultas/consultarDebito.jsf",
+        captcha_key = driver.find_element(By.ID, "recaptcha").get_attribute("data-sitekey"),
+        solver = recaptchaV2EnterpriseProxyless(),
+        input_id = "g-recaptcha-response"
+        )
+    if solution:
+        driver.find_element(By.XPATH, '//*[@id="consultaDebitoForm:j_id64_body"]/div[2]/input[2]').click()
 
 if __name__=="__main__":
     # PROXY não estava funcionando no GeckoDriver
@@ -87,12 +66,10 @@ if __name__=="__main__":
     IP = "185.231.114.140"
     PORT = "8585"
     PROXY = "{IP}:{PORT}"
-    #download_anti_captcha_plugin()
-    #configure_API_key_in_anti_captcha_plugin_file(api_key)
-    driver = create_driver(extensions=[]) #./plugin.zip not working as expected...
+    driver = create_driver() 
     driver.implicitly_wait(5)
     # test_proxy(IP)
-    # test_plugin_anticaptcha()
+    # consultar("CNPJ", "06330557000177")
 
 
 
