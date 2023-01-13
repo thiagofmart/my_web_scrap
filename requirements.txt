@@ -1,5 +1,0 @@
-pandas
-selenium
-openpyxl
-pprint
-unidecode
